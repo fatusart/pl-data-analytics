@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from functools import lru_cache
 from pathlib import Path
+from urllib.parse import quote_plus
 
 import yaml
 from pydantic import Field
@@ -21,6 +22,7 @@ class Settings(BaseSettings):
     db_name: str = "premier_league"
     db_user: str = "pl_user"
     db_password: str = "pl_password"
+    db_sslmode: str = "prefer"   # "require" pour une base hébergée (Neon, Supabase…)
 
     # --- Périmètre temporel ---
     first_season: int = Field(2016, description="Année de début de la 1re saison (2016 => 2016-17)")
@@ -44,8 +46,8 @@ class Settings(BaseSettings):
     @property
     def sqlalchemy_url(self) -> str:
         return (
-            f"postgresql+psycopg://{self.db_user}:{self.db_password}"
-            f"@{self.db_host}:{self.db_port}/{self.db_name}"
+            f"postgresql+psycopg://{quote_plus(self.db_user)}:{quote_plus(self.db_password)}"
+            f"@{self.db_host}:{self.db_port}/{self.db_name}?sslmode={self.db_sslmode}"
         )
 
     @property
