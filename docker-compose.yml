@@ -1,0 +1,103 @@
+name: pl-data-platform
+
+x-app-env: &app-env
+  PL_DB_HOST: postgres
+  PL_DB_PORT: 5432
+  PL_DB_NAME: ${POSTGRES_DB:-premier_league}
+  PL_DB_USER: ${POSTGRES_USER:-pl_user}
+  PL_DB_PASSWORD: ${POSTGRES_PASSWORD:-pl_password}
+  PL_DATA_DIR: /app/data
+  PL_LOG_LEVEL: ${PL_LOG_LEVEL:-INFO}
+  PL_API_FOOTBALL_KEY: ${PL_API_FOOTBALL_KEY:-}
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: pl_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-premier_league}
+      POSTGRES_USER: ${POSTGRES_USER:-pl_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-pl_password}
+      TZ: Europe/London
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+      # Exécutés automatiquement (ordre alphabétique) au PREMIER démarrage du volume
+      - ./sql:/docker-entrypoint-initdb.d:ro
+    command: >
+      postgres
+      -c shared_buffers=256MB
+      -c work_mem=32MB
+      -c maintenance_work_mem=128MB
+      -c effective_cache_size=768MB
+      -c random_page_cost=1.1
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  # Conteneur d'exécution ETL : lancé à la demande
+  #   docker compose run --rm etl backfill
+  #   docker compose run --rm etl incremental
+  etl:
+    build: .
+    image: pl-data-platform:latest
+    environment: *app-env
+    volumes:
+      - ./data:/app/data
+      - ./config:/app/config:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    entrypoint: ["python", "-m", "pipelines.cli"]
+    command: ["--help"]
+    profiles: ["etl"]
+
+  # Planificateur : mise à jour incrémentale de la saison en cours
+  scheduler:
+    image: pl-data-platform:latest
+    build: .
+    restart: unless-stopped
+    environment: *app-env
+    volumes:
+      - ./data:/app/data
+      - ./config:/app/config:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: ["python", "-m", "pipelines.scheduler"]
+    profiles: ["scheduler"]
+
+  dashboard:
+    image: pl-data-platform:latest
+    build: .
+    restart: unless-stopped
+    environment: *app-env
+    ports:
+      - "8501:8501"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command:
+      - streamlit
+      - run
+      - dashboard/app.py
+      - --server.port=8501
+      - --server.address=0.0.0.0
+
+  pgadmin:
+    image: dpage/pgadmin4:8
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@local.dev}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin}
+    ports:
+      - "5050:80"
+    depends_on:
+      - postgres
+    profiles: ["tools"]
+
+volumes:
+  pg_data:

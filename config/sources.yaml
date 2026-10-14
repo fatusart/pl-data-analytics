@@ -1,0 +1,49 @@
+# Déclaration des sources : URLs, gabarits et politique de débit.
+# {fd_code} = '1617', {label} = '2016-17', {year} = 2016
+
+football_data:
+  description: "Résultats, stats de match, arbitres et cotes (football-data.co.uk)"
+  url_template: "https://www.football-data.co.uk/mmz4281/{fd_code}/E0.csv"
+  rate_limit: {rate: 0.5, burst: 1}        # site amateur : rester très courtois
+  encoding_candidates: ["utf-8-sig", "latin-1"]
+
+fpl_api:
+  description: "API officielle Fantasy Premier League (saison en cours uniquement)"
+  base_url: "https://fantasy.premierleague.com/api"
+  endpoints:
+    bootstrap: "/bootstrap-static/"
+    fixtures: "/fixtures/"
+    element_summary: "/element-summary/{element_id}/"
+    event_live: "/event/{gw}/live/"
+  rate_limit: {rate: 2.0, burst: 4}
+
+fpl_history:
+  description: "Archive open-source des saisons FPL passées (vaastav/Fantasy-Premier-League)"
+  base_url: "https://raw.githubusercontent.com/vaastav/Fantasy-Premier-League/master/data"
+  files:
+    merged_gw: "{label}/gws/merged_gw.csv"
+    players_raw: "{label}/players_raw.csv"
+    fixtures: "{label}/fixtures.csv"
+    teams: "{label}/teams.csv"            # absent des premières saisons -> master_team_list
+  global_files:
+    master_team_list: "master_team_list.csv"
+  rate_limit: {rate: 3.0, burst: 5}
+
+fpl_core_insights:
+  description: >
+    Dépôt open-source FPL-Core-Insights (stats avancées par match/joueur, saisons récentes).
+    La structure du dépôt évolue : vérifier les chemins ci-dessous avant activation.
+  enabled: false
+  base_url: "https://raw.githubusercontent.com/olbauday/FPL-Core-Insights/main/data"
+  files:
+    matches: "{label_long}/matches/matches.csv"
+    playermatchstats: "{label_long}/playermatchstats/playermatchstats.csv"
+  seasons: [2024, 2025, 2026]
+  rate_limit: {rate: 3.0, burst: 5}
+
+api_football:
+  description: "API-Football v3 (optionnel, nécessite PL_API_FOOTBALL_KEY)"
+  base_url: "https://v3.football.api-sports.io"
+  league_id: 39
+  rate_limit: {rate: 0.15, burst: 1}       # offre gratuite ~10 req/min, 100 req/jour
+  daily_quota: 100
